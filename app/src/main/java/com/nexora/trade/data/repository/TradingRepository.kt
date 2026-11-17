@@ -28,7 +28,7 @@ data class DaySnapshot(
     val summary: DailyCalculationSummary
 )
 
-fun interface TransactionRunner {
+interface TransactionRunner {
     suspend fun <T> runInTransaction(block: suspend () -> T): T
 }
 
@@ -37,6 +37,12 @@ class RoomTransactionRunner(
 ) : TransactionRunner {
     override suspend fun <T> runInTransaction(block: suspend () -> T): T {
         return database.withTransaction { block() }
+    }
+}
+
+class ImmediateTransactionRunner : TransactionRunner {
+    override suspend fun <T> runInTransaction(block: suspend () -> T): T {
+        return block()
     }
 }
 
