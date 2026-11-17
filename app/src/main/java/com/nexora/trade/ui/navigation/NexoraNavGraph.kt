@@ -49,6 +49,10 @@ import com.nexora.trade.R
 import com.nexora.trade.ui.screens.dashboard.DashboardScreen
 import com.nexora.trade.ui.screens.dashboard.DashboardViewModel
 import com.nexora.trade.ui.screens.splash.SplashScreen
+import com.nexora.trade.ui.screens.trade.AddEditTradeScreen
+import com.nexora.trade.ui.screens.trade.AddEditTradeViewModel
+import com.nexora.trade.ui.screens.trade.DailyTradeDetailsScreen
+import com.nexora.trade.ui.screens.trade.DailyTradeDetailsViewModel
 import com.nexora.trade.ui.theme.NexoraTheme
 import java.time.LocalDate
 
@@ -215,128 +219,26 @@ fun NexoraNavGraph() {
                     }
                 )
             ) { backStackEntry ->
-                val date = backStackEntry.arguments?.getString(NexoraRoutes.ARG_DATE)
-                    ?: LocalDate.now().toString()
-                StepDetailShellScreen(
-                    title = "Daily Details ($date)",
-                    subtitle = "Daily trade details will be implemented in Step 6.",
-                    onNavigateBack = { navController.popBackStack() }
+                val rawDate = backStackEntry.arguments?.getString(NexoraRoutes.ARG_DATE)
+                val date = parseLocalDateOrDefault(rawDate)
+                val detailsViewModel: DailyTradeDetailsViewModel = viewModel(
+                    key = "details_$date",
+                    factory = DailyTradeDetailsViewModel.provideFactory(repository, date)
                 )
-            }
-
-            composable(
-                route = NexoraRoutes.ADD_EDIT_TRADE_PATTERN,
-                arguments = listOf(
-                    navArgument(NexoraRoutes.ARG_DATE) {
-                        type = NavType.StringType
-                        defaultValue = LocalDate.now().toString()
+                DailyTradeDetailsScreen(
+                    viewModel = detailsViewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onAddTradeClick = { targetDate ->
+                        navController.navigate(NexoraRoutes.addTrade(targetDate.toString()))
                     },
-                    navArgument(NexoraRoutes.ARG_TRADE_ID) {
-                        type = NavType.LongType
-                        defaultValue = -1L
+                    onEditTradeClick = { targetDate, tradeId ->
+                        navController.navigate(NexoraRoutes.editTrade(targetDate.toString(), tradeId))
+                    },
+                    onOpenReflectionClick = { targetDate ->
+                        navController.navigate(NexoraRoutes.reflection(targetDate.toString()))
                     }
-                )
-            ) { backStackEntry ->
-                val date = backStackEntry.arguments?.getString(NexoraRoutes.ARG_DATE)
-                    ?: LocalDate.now().toString()
-                val tradeId = backStackEntry.arguments?.getLong(NexoraRoutes.ARG_TRADE_ID) ?: -1L
-                StepDetailShellScreen(
-                    title = if (tradeId > 0) "Edit Trade" else "Add Trade ($date)",
-                    subtitle = "Trade entry flow will be implemented in Step 6.",
-                    onNavigateBack = { navController.popBackStack() }
                 )
             }
 
             composable(
-                route = NexoraRoutes.REFLECTION_PATTERN,
-                arguments = listOf(
-                    navArgument(NexoraRoutes.ARG_DATE) {
-                        type = NavType.StringType
-                        defaultValue = LocalDate.now().toString()
-                    }
-                )
-            ) { backStackEntry ->
-                val date = backStackEntry.arguments?.getString(NexoraRoutes.ARG_DATE)
-                    ?: LocalDate.now().toString()
-                StepDetailShellScreen(
-                    title = "Daily Reflection ($date)",
-                    subtitle = "Daily reflection editor will be implemented in Step 8.",
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StepShellScreen(
-    title: String,
-    subtitle: String
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun StepDetailShellScreen(
-    title: String,
-    subtitle: String,
-    onNavigateBack: () -> Unit
-) {
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text(text = title) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
+                
