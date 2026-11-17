@@ -219,8 +219,9 @@ fun NexoraNavGraph() {
                     }
                 )
             ) { backStackEntry ->
-                val rawDate = backStackEntry.arguments?.getString(NexoraRoutes.ARG_DATE)
-                val date = parseLocalDateOrDefault(rawDate)
+                val date = parseLocalDateOrDefault(
+                    backStackEntry.arguments?.getString(NexoraRoutes.ARG_DATE)
+                )
                 val detailsViewModel: DailyTradeDetailsViewModel = viewModel(
                     key = "details_$date",
                     factory = DailyTradeDetailsViewModel.provideFactory(repository, date)
@@ -241,4 +242,126 @@ fun NexoraNavGraph() {
             }
 
             composable(
-                
+                route = NexoraRoutes.ADD_EDIT_TRADE_PATTERN,
+                arguments = listOf(
+                    navArgument(NexoraRoutes.ARG_DATE) {
+                        type = NavType.StringType
+                        defaultValue = LocalDate.now().toString()
+                    },
+                    navArgument(NexoraRoutes.ARG_TRADE_ID) {
+                        type = NavType.LongType
+                        defaultValue = -1L
+                    }
+                )
+            ) { backStackEntry ->
+                val date = parseLocalDateOrDefault(
+                    backStackEntry.arguments?.getString(NexoraRoutes.ARG_DATE)
+                )
+                val tradeId = backStackEntry.arguments?.getLong(NexoraRoutes.ARG_TRADE_ID) ?: -1L
+                val tradeViewModel: AddEditTradeViewModel = viewModel(
+                    key = "add_edit_trade_${date}_$tradeId",
+                    factory = AddEditTradeViewModel.provideFactory(repository, date, tradeId)
+                )
+                AddEditTradeScreen(
+                    viewModel = tradeViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                route = NexoraRoutes.REFLECTION_PATTERN,
+                arguments = listOf(
+                    navArgument(NexoraRoutes.ARG_DATE) {
+                        type = NavType.StringType
+                        defaultValue = LocalDate.now().toString()
+                    }
+                )
+            ) { backStackEntry ->
+                val date = backStackEntry.arguments?.getString(NexoraRoutes.ARG_DATE)
+                    ?: LocalDate.now().toString()
+                StepDetailShellScreen(
+                    title = "Daily Reflection ($date)",
+                    subtitle = "Daily reflection editor will be implemented in Step 8.",
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+        }
+    }
+}
+
+private fun parseLocalDateOrDefault(raw: String?): LocalDate {
+    return runCatching { raw?.let(LocalDate::parse) }.getOrNull() ?: LocalDate.now()
+}
+
+@Composable
+private fun StepShellScreen(
+    title: String,
+    subtitle: String
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StepDetailShellScreen(
+    title: String,
+    subtitle: String,
+    onNavigateBack: () -> Unit
+) {
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = { Text(text = title) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
