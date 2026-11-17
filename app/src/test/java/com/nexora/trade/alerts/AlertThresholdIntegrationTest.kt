@@ -39,7 +39,6 @@ class AlertThresholdIntegrationTest {
 
         repo.setStartingBalance(dayOne, BigDecimal("100.00"))
 
-        // Trade 1: +6 -> still in progress, no alert
         val vm1 = AddEditTradeViewModel(repo, dayOne, -1L, spyAlertManager)
         vm1.selectTradeType(TradeType.PROFIT)
         vm1.updateAmountInput("6")
@@ -47,7 +46,6 @@ class AlertThresholdIntegrationTest {
         vm1.confirmSaveTrade()
         assertEquals(0, spyAlertManager.dispatchedAlerts.size)
 
-        // Trade 2: +4 (total +10 = +10%) -> triggers PROFIT_TARGET_COMPLETED once
         val vm2 = AddEditTradeViewModel(repo, dayOne, -1L, spyAlertManager)
         vm2.selectTradeType(TradeType.PROFIT)
         vm2.updateAmountInput("4")
@@ -58,7 +56,6 @@ class AlertThresholdIntegrationTest {
             spyAlertManager.dispatchedAlerts
         )
 
-        // Trade 3: +3 (total +13) -> does not trigger duplicate alert
         val vm3 = AddEditTradeViewModel(repo, dayOne, -1L, spyAlertManager)
         vm3.selectTradeType(TradeType.PROFIT)
         vm3.updateAmountInput("3")
@@ -75,21 +72,18 @@ class AlertThresholdIntegrationTest {
         repo.setStartingBalance(dayOne, BigDecimal("250.00"))
         repo.setStartingBalance(dayTwo, BigDecimal("100.00"))
 
-        // Day 1: -12.50 (-5%) -> triggers LOSS_LIMIT_REACHED once
         val dayOneVm = AddEditTradeViewModel(repo, dayOne, -1L, spyAlertManager)
         dayOneVm.selectTradeType(TradeType.LOSS)
         dayOneVm.updateAmountInput("12.50")
         dayOneVm.requestSaveConfirmation()
         dayOneVm.confirmSaveTrade()
 
-        // Day 1 extra loss -> does not duplicate
         val dayOneExtraVm = AddEditTradeViewModel(repo, dayOne, -1L, spyAlertManager)
         dayOneExtraVm.selectTradeType(TradeType.LOSS)
         dayOneExtraVm.updateAmountInput("2.00")
         dayOneExtraVm.requestSaveConfirmation()
         dayOneExtraVm.confirmSaveTrade()
 
-        // Day 2: +10 (+10%) -> independent date triggers PROFIT_TARGET_COMPLETED once
         val dayTwoVm = AddEditTradeViewModel(repo, dayTwo, -1L, spyAlertManager)
         dayTwoVm.selectTradeType(TradeType.PROFIT)
         dayTwoVm.updateAmountInput("10")
@@ -120,7 +114,6 @@ class AlertThresholdIntegrationTest {
 
         val savedTradeId = repo.observeDaySnapshot(dayOne).first().trades.first().id
 
-        // Edit trade down to +6 -> status becomes IN_PROGRESS, no extra alert
         val editVm = AddEditTradeViewModel(repo, dayOne, savedTradeId, spyAlertManager)
         editVm.selectTradeType(TradeType.PROFIT)
         editVm.updateAmountInput("6")
@@ -131,7 +124,6 @@ class AlertThresholdIntegrationTest {
         assertEquals(DailyStatus.IN_PROGRESS, snapAfterEdit.summary.status)
         assertEquals(1, spyAlertManager.dispatchedAlerts.size)
 
-        // Re-add +4 -> still no duplicate alert on the same day
         val addBackVm = AddEditTradeViewModel(repo, dayOne, -1L, spyAlertManager)
         addBackVm.selectTradeType(TradeType.PROFIT)
         addBackVm.updateAmountInput("4")
@@ -158,6 +150,10 @@ class AlertThresholdIntegrationTest {
         override fun dispatchThresholdAlert(alertType: DailyAlertType, date: LocalDate) {
             dispatchedAlerts.add(alertType to date)
         }
+
+        override fun hasNotificationPermission(): Boolean = true
+
+        override fun areSystemNotificationsEnabled(): Boolean = true
     }
 
     private class TestDailyRecordDao : DailyRecordDao {
