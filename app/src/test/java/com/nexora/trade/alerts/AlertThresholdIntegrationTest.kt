@@ -4,8 +4,8 @@ import com.nexora.trade.data.local.dao.DailyRecordDao
 import com.nexora.trade.data.local.dao.TradeDao
 import com.nexora.trade.data.local.entity.DailyRecordEntity
 import com.nexora.trade.data.local.entity.TradeEntity
+import com.nexora.trade.data.repository.ImmediateTransactionRunner
 import com.nexora.trade.data.repository.RoomTradingRepository
-import com.nexora.trade.data.repository.TransactionRunner
 import com.nexora.trade.domain.model.DailyAlertType
 import com.nexora.trade.domain.model.DailyStatus
 import com.nexora.trade.domain.model.TradeType
@@ -139,7 +139,7 @@ class AlertThresholdIntegrationTest {
         return RoomTradingRepository(
             dailyRecordDao = TestDailyRecordDao(),
             tradeDao = TestTradeDao(),
-            transactionRunner = TransactionRunner { block -> block() },
+            transactionRunner = ImmediateTransactionRunner(),
             timeProvider = { 1700000000000L }
         )
     }
