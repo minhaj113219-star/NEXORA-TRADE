@@ -1,5 +1,10 @@
 package com.nexora.trade.ui.navigation
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +27,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -93,8 +100,34 @@ fun NexoraNavGraph() {
     val currentDestination = navBackStackEntry?.destination
     val currentRoute = currentDestination?.route
 
-    val application = LocalContext.current.applicationContext as NexoraApplication
+    val context = LocalContext.current
+    val application = context.applicationContext as NexoraApplication
     val repository = application.appContainer.tradingRepository
+    val alertManager = application.appContainer.tradingAlertManager
+    val alertPreferences = application.appContainer.alertPreferences
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) {
+        alertPreferences.markNotificationPermissionPrompted()
+    }
+
+    LaunchedEffect(currentRoute) {
+        if (currentRoute == NexoraRoutes.DASHBOARD &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !alertPreferences.hasPromptedNotificationPermission()
+        ) {
+            val granted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                alertPreferences.markNotificationPermissionPrompted()
+            }
+        }
+    }
 
     val showBottomBar = currentRoute in setOf(
         NexoraRoutes.DASHBOARD,
@@ -174,7 +207,7 @@ fun NexoraNavGraph() {
 
             composable(NexoraRoutes.DASHBOARD) {
                 val dashboardViewModel: DashboardViewModel = viewModel(
-                    factory = DashboardViewModel.provideFactory(repository)
+                    factory = DashboardViewModel.provideFactory(repository, alertManager)
                 )
                 DashboardScreen(
                     viewModel = dashboardViewModel,
@@ -271,7 +304,12 @@ fun NexoraNavGraph() {
                 val tradeId = backStackEntry.arguments?.getLong(NexoraRoutes.ARG_TRADE_ID) ?: -1L
                 val tradeViewModel: AddEditTradeViewModel = viewModel(
                     key = "add_edit_trade_${date}_$tradeId",
-                    factory = AddEditTradeViewModel.provideFactory(repository, date, tradeId)
+                    factory = AddEditTradeViewModel.provideFactory(
+                        repository = repository,
+                        date = date,
+                        tradeId = tradeId,
+                        alertManager = alertManager
+                    )
                 )
                 AddEditTradeScreen(
                     viewModel = tradeViewModel,
