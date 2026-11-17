@@ -3,6 +3,8 @@ package com.nexora.trade.ui.screens.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.nexora.trade.alerts.NoOpTradingAlertManager
+import com.nexora.trade.alerts.TradingAlertManager
 import com.nexora.trade.data.repository.DaySnapshot
 import com.nexora.trade.data.repository.TradingRepository
 import com.nexora.trade.domain.calculator.MoneyCalculator
@@ -52,6 +54,7 @@ data class DashboardUiState(
 @OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModel(
     private val repository: TradingRepository,
+    private val alertManager: TradingAlertManager = NoOpTradingAlertManager,
     private val dateProvider: () -> LocalDate = { LocalDate.now() }
 ) : ViewModel() {
 
@@ -152,19 +155,24 @@ class DashboardViewModel(
         viewModelScope.launch {
             val alertResult = repository.setStartingBalance(targetDate, balance)
             dialogState.value = StartingBalanceDialogState.Hidden
-            if (alertResult.alertToTrigger != null) {
-                activeAlertBanner.update { alertResult.alertToTrigger }
+            val alertToTrigger = alertResult.alertToTrigger
+            if (alertToTrigger != null) {
+                alertManager.dispatchThresholdAlert(alertToTrigger, targetDate)
+                activeAlertBanner.update { alertToTrigger }
             }
         }
     }
 
     companion object {
-        fun provideFactory(repository: TradingRepository): ViewModelProvider.Factory {
+        fun provideFactory(
+            repository: TradingRepository,
+            alertManager: TradingAlertManager
+        ): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     if (modelClass.isAssignableFrom(DashboardViewModel::class.java)) {
-                        return DashboardViewModel(repository) as T
+                        return DashboardViewModel(repository, alertManager) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                 }
