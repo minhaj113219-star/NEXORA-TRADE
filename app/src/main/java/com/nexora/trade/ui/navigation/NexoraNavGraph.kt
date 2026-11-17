@@ -31,9 +31,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -42,7 +44,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.nexora.trade.NexoraApplication
 import com.nexora.trade.R
+import com.nexora.trade.ui.screens.dashboard.DashboardScreen
+import com.nexora.trade.ui.screens.dashboard.DashboardViewModel
 import com.nexora.trade.ui.screens.splash.SplashScreen
 import com.nexora.trade.ui.theme.NexoraTheme
 import java.time.LocalDate
@@ -82,6 +87,9 @@ fun NexoraNavGraph() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val currentRoute = currentDestination?.route
+
+    val application = LocalContext.current.applicationContext as NexoraApplication
+    val repository = application.appContainer.tradingRepository
 
     val showBottomBar = currentRoute in setOf(
         NexoraRoutes.DASHBOARD,
@@ -160,9 +168,20 @@ fun NexoraNavGraph() {
             }
 
             composable(NexoraRoutes.DASHBOARD) {
-                StepShellScreen(
-                    title = "NEXORA TRADE",
-                    subtitle = "Dashboard module will be connected in Step 5 after the calculation engine and Room persistence are verified."
+                val dashboardViewModel: DashboardViewModel = viewModel(
+                    factory = DashboardViewModel.provideFactory(repository)
+                )
+                DashboardScreen(
+                    viewModel = dashboardViewModel,
+                    onAddTradeClick = { date ->
+                        navController.navigate(NexoraRoutes.addTrade(date.toString()))
+                    },
+                    onOpenReflectionClick = { date ->
+                        navController.navigate(NexoraRoutes.reflection(date.toString()))
+                    },
+                    onOpenDailyDetailsClick = { date ->
+                        navController.navigate(NexoraRoutes.dailyDetails(date.toString()))
+                    }
                 )
             }
 
