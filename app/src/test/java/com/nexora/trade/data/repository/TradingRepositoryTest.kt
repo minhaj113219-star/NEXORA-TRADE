@@ -36,7 +36,7 @@ class TradingRepositoryTest {
         repository = RoomTradingRepository(
             dailyRecordDao = fakeDailyRecordDao,
             tradeDao = fakeTradeDao,
-            transactionRunner = TransactionRunner { block -> block() },
+            transactionRunner = ImmediateTransactionRunner(),
             timeProvider = { 1700000000000L }
         )
     }
