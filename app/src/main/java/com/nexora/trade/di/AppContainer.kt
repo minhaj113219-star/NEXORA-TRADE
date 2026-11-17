@@ -3,6 +3,7 @@ package com.nexora.trade.di
 import android.content.Context
 import com.nexora.trade.alerts.AlertPreferences
 import com.nexora.trade.alerts.AndroidTradingAlertManager
+import com.nexora.trade.alerts.AppSettingsStore
 import com.nexora.trade.alerts.TradingAlertManager
 import com.nexora.trade.data.local.NexoraDatabase
 import com.nexora.trade.data.repository.RoomTradingRepository
@@ -12,7 +13,7 @@ import com.nexora.trade.data.repository.TradingRepository
 interface AppContainer {
     val database: NexoraDatabase
     val tradingRepository: TradingRepository
-    val alertPreferences: AlertPreferences
+    val alertPreferences: AppSettingsStore
     val tradingAlertManager: TradingAlertManager
 }
 
@@ -31,7 +32,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
         )
     }
 
-    override val alertPreferences: AlertPreferences by lazy {
+    override val alertPreferences: AppSettingsStore by lazy {
         AlertPreferences(appContext)
     }
 
