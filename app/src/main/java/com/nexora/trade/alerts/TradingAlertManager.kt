@@ -22,17 +22,24 @@ import com.nexora.trade.R
 import com.nexora.trade.domain.model.DailyAlertType
 import java.time.LocalDate
 
-interface TradingAlertManager {
+interface NotificationStatusProvider {
+    fun hasNotificationPermission(): Boolean
+    fun areSystemNotificationsEnabled(): Boolean
+}
+
+interface TradingAlertManager : NotificationStatusProvider {
     fun dispatchThresholdAlert(alertType: DailyAlertType, date: LocalDate)
 }
 
 object NoOpTradingAlertManager : TradingAlertManager {
     override fun dispatchThresholdAlert(alertType: DailyAlertType, date: LocalDate) = Unit
+    override fun hasNotificationPermission(): Boolean = true
+    override fun areSystemNotificationsEnabled(): Boolean = true
 }
 
 class AndroidTradingAlertManager(
     context: Context,
-    private val alertPreferences: AlertPreferences
+    private val alertPreferences: AppSettingsStore
 ) : TradingAlertManager {
 
     private val appContext = context.applicationContext
@@ -51,7 +58,7 @@ class AndroidTradingAlertManager(
         postNotificationIfPermitted(alertType, date)
     }
 
-    fun hasNotificationPermission(): Boolean {
+    override fun hasNotificationPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
                 appContext,
@@ -62,7 +69,7 @@ class AndroidTradingAlertManager(
         }
     }
 
-    fun areSystemNotificationsEnabled(): Boolean {
+    override fun areSystemNotificationsEnabled(): Boolean {
         return NotificationManagerCompat.from(appContext).areNotificationsEnabled()
     }
 
@@ -76,7 +83,6 @@ class AndroidTradingAlertManager(
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "Alerts when your fixed +10% profit target or −5% loss limit is reached."
-            // Sound and vibration are handled once via device settings and AlertPreferences
             setSound(null, null)
             enableVibration(false)
         }
