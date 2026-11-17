@@ -3,6 +3,8 @@ package com.nexora.trade.ui.screens.trade
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.nexora.trade.alerts.NoOpTradingAlertManager
+import com.nexora.trade.alerts.TradingAlertManager
 import com.nexora.trade.data.repository.TradingRepository
 import com.nexora.trade.domain.calculator.MoneyCalculator
 import com.nexora.trade.domain.model.DailyAlertType
@@ -39,7 +41,8 @@ data class AddEditTradeUiState(
 class AddEditTradeViewModel(
     private val repository: TradingRepository,
     private val date: LocalDate,
-    private val tradeId: Long
+    private val tradeId: Long,
+    private val alertManager: TradingAlertManager = NoOpTradingAlertManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -146,11 +149,13 @@ class AddEditTradeViewModel(
                 )
             }
 
-            if (alertResult.alertToTrigger != null) {
+            val alertToTrigger = alertResult.alertToTrigger
+            if (alertToTrigger != null) {
+                alertManager.dispatchThresholdAlert(alertToTrigger, current.date)
                 _uiState.update {
                     it.copy(
                         isSaving = false,
-                        triggeredAlert = alertResult.alertToTrigger
+                        triggeredAlert = alertToTrigger
                     )
                 }
             } else {
@@ -177,13 +182,14 @@ class AddEditTradeViewModel(
         fun provideFactory(
             repository: TradingRepository,
             date: LocalDate,
-            tradeId: Long
+            tradeId: Long,
+            alertManager: TradingAlertManager
         ): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     if (modelClass.isAssignableFrom(AddEditTradeViewModel::class.java)) {
-                        return AddEditTradeViewModel(repository, date, tradeId) as T
+                        return AddEditTradeViewModel(repository, date, tradeId, alertManager) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                 }
