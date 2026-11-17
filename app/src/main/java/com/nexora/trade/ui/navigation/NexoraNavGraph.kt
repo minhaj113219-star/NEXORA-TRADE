@@ -48,7 +48,11 @@ import com.nexora.trade.NexoraApplication
 import com.nexora.trade.R
 import com.nexora.trade.ui.screens.dashboard.DashboardScreen
 import com.nexora.trade.ui.screens.dashboard.DashboardViewModel
+import com.nexora.trade.ui.screens.history.TradeHistoryScreen
+import com.nexora.trade.ui.screens.history.TradeHistoryViewModel
 import com.nexora.trade.ui.screens.splash.SplashScreen
+import com.nexora.trade.ui.screens.thirtyday.ThirtyDayManagementScreen
+import com.nexora.trade.ui.screens.thirtyday.ThirtyDayViewModel
 import com.nexora.trade.ui.screens.trade.AddEditTradeScreen
 import com.nexora.trade.ui.screens.trade.AddEditTradeViewModel
 import com.nexora.trade.ui.screens.trade.DailyTradeDetailsScreen
@@ -190,16 +194,26 @@ fun NexoraNavGraph() {
             }
 
             composable(NexoraRoutes.THIRTY_DAY) {
-                StepShellScreen(
-                    title = "30-Day Management",
-                    subtitle = "30-day calendar summary will be implemented in Step 7."
+                val thirtyDayViewModel: ThirtyDayViewModel = viewModel(
+                    factory = ThirtyDayViewModel.provideFactory(repository)
+                )
+                ThirtyDayManagementScreen(
+                    viewModel = thirtyDayViewModel,
+                    onDayClick = { date ->
+                        navController.navigate(NexoraRoutes.dailyDetails(date.toString()))
+                    }
                 )
             }
 
             composable(NexoraRoutes.HISTORY) {
-                StepShellScreen(
-                    title = "Trade History",
-                    subtitle = "Persistent trade history will be implemented in Step 7."
+                val historyViewModel: TradeHistoryViewModel = viewModel(
+                    factory = TradeHistoryViewModel.provideFactory(repository)
+                )
+                TradeHistoryScreen(
+                    viewModel = historyViewModel,
+                    onOpenDayDetails = { date ->
+                        navController.navigate(NexoraRoutes.dailyDetails(date.toString()))
+                    }
                 )
             }
 
