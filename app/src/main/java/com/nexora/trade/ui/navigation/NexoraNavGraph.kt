@@ -9,23 +9,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -50,6 +45,8 @@ import com.nexora.trade.ui.screens.dashboard.DashboardScreen
 import com.nexora.trade.ui.screens.dashboard.DashboardViewModel
 import com.nexora.trade.ui.screens.history.TradeHistoryScreen
 import com.nexora.trade.ui.screens.history.TradeHistoryViewModel
+import com.nexora.trade.ui.screens.reflection.DailyReflectionScreen
+import com.nexora.trade.ui.screens.reflection.DailyReflectionViewModel
 import com.nexora.trade.ui.screens.splash.SplashScreen
 import com.nexora.trade.ui.screens.thirtyday.ThirtyDayManagementScreen
 import com.nexora.trade.ui.screens.thirtyday.ThirtyDayViewModel
@@ -291,11 +288,15 @@ fun NexoraNavGraph() {
                     }
                 )
             ) { backStackEntry ->
-                val date = backStackEntry.arguments?.getString(NexoraRoutes.ARG_DATE)
-                    ?: LocalDate.now().toString()
-                StepDetailShellScreen(
-                    title = "Daily Reflection ($date)",
-                    subtitle = "Daily reflection editor will be implemented in Step 8.",
+                val date = parseLocalDateOrDefault(
+                    backStackEntry.arguments?.getString(NexoraRoutes.ARG_DATE)
+                )
+                val reflectionViewModel: DailyReflectionViewModel = viewModel(
+                    key = "reflection_$date",
+                    factory = DailyReflectionViewModel.provideFactory(repository, date)
+                )
+                DailyReflectionScreen(
+                    viewModel = reflectionViewModel,
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
@@ -332,50 +333,5 @@ private fun StepShellScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun StepDetailShellScreen(
-    title: String,
-    subtitle: String,
-    onNavigateBack: () -> Unit
-) {
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text(text = title) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
     }
 }
