@@ -53,6 +53,8 @@ interface TradingRepository {
     fun observeDailyRecord(date: LocalDate): Flow<DailyRecord?>
     suspend fun getTradeById(tradeId: Long): TradeEntry?
 
+    suspend fun ensureCarryOverStartingBalance(date: LocalDate): AlertEvaluationResult?
+
     suspend fun setStartingBalance(
         date: LocalDate,
         startingBalance: BigDecimal
@@ -63,14 +65,18 @@ interface TradingRepository {
         type: TradeType,
         amount: BigDecimal,
         note: String,
-        timestampMillis: Long = System.currentTimeMillis()
+        timestampMillis: Long = System.currentTimeMillis(),
+        stakeAmount: BigDecimal? = null,
+        payoutPercent: BigDecimal? = null
     ): AlertEvaluationResult
 
     suspend fun updateTrade(
         tradeId: Long,
         type: TradeType,
         amount: BigDecimal,
-        note: String
+        note: String,
+        stakeAmount: BigDecimal? = null,
+        payoutPercent: BigDecimal? = null
     ): AlertEvaluationResult
 
     suspend fun deleteTrade(tradeId: Long)
@@ -145,6 +151,78 @@ class RoomTradingRepository(
         return tradeDao.getTradeById(tradeId)?.toDomain()
     }
 
+    override suspend fun ensureCarryOverStartingBalance(date: LocalDate): AlertEvaluationResult? {
+        val dateKey = date.toString()
+        return transactionRunner.runInTransaction {
+            val existingToday = dailyRecordDao.getRecord(dateKey)
+            val hasManualBalance = existingToday?.startingBalance != null &&
+                existingToday.startingBalance > BigDecimal.ZERO &&
+                !existingToday.isAutoCarriedOver
+
+            if (hasManualBalance) {
+                return@runInTransaction null
+            }
+
+            val latestPrevRecord = dailyRecordDao.getRecordsWithBalanceBefore(dateKey)
+                .firstOrNull { it.startingBalance != null && it.startingBalance > BigDecimal.ZERO }
+                ?: return@runInTransaction null
+
+            val prevDate = LocalDate.parse(latestPrevRecord.dateKey)
+            val prevTrades = tradeDao.getTradesForDate(latestPrevRecord.dateKey).map { it.toDomain() }
+            val prevSummary = MoneyCalculator.calculateDailySummary(
+                date = prevDate,
+                startingBalance = latestPrevRecord.startingBalance,
+                trades = prevTrades
+            )
+
+            val carryOverBalance = prevSummary.currentBalance
+            if (carryOverBalance <= BigDecimal.ZERO) {
+                return@runInTransaction null
+            }
+
+            val normalized = MoneyCalculator.normalizeCurrency(carryOverBalance)
+            if (existingToday?.startingBalance != null &&
+                existingToday.startingBalance.compareTo(normalized) == 0 &&
+                existingToday.isAutoCarriedOver
+            ) {
+                return@runInTransaction null
+            }
+
+            val balanceChanged = existingToday?.startingBalance?.compareTo(normalized) != 0
+            val baselineRecord = DailyRecord(
+                date = date,
+                startingBalance = normalized,
+                targetAlertTriggered = if (balanceChanged) false else (existingToday?.targetAlertTriggered ?: false),
+                lossAlertTriggered = if (balanceChanged) false else (existingToday?.lossAlertTriggered ?: false),
+                reflectionText = existingToday?.reflectionText.orEmpty(),
+                updatedAtMillis = timeProvider(),
+                isAutoCarriedOver = true
+            )
+
+            val tradesToday = tradeDao.getTradesForDate(dateKey).map { it.toDomain() }
+            val summaryToday = MoneyCalculator.calculateDailySummary(
+                date = date,
+                startingBalance = normalized,
+                trades = tradesToday
+            )
+            val evaluation = AlertEvaluator.evaluate(summaryToday, baselineRecord)
+
+            dailyRecordDao.upsert(
+                DailyRecordEntity(
+                    dateKey = dateKey,
+                    startingBalance = normalized,
+                    targetAlertTriggered = evaluation.updatedTargetAlertTriggered,
+                    lossAlertTriggered = evaluation.updatedLossAlertTriggered,
+                    reflectionText = baselineRecord.reflectionText,
+                    updatedAtMillis = timeProvider(),
+                    isAutoCarriedOver = true
+                )
+            )
+
+            evaluation
+        }
+    }
+
     override suspend fun setStartingBalance(
         date: LocalDate,
         startingBalance: BigDecimal
@@ -165,7 +243,8 @@ class RoomTradingRepository(
                 targetAlertTriggered = if (balanceChanged) false else (existing?.targetAlertTriggered ?: false),
                 lossAlertTriggered = if (balanceChanged) false else (existing?.lossAlertTriggered ?: false),
                 reflectionText = existing?.reflectionText.orEmpty(),
-                updatedAtMillis = timeProvider()
+                updatedAtMillis = timeProvider(),
+                isAutoCarriedOver = false
             )
 
             val trades = tradeDao.getTradesForDate(dateKey).map { it.toDomain() }
@@ -183,7 +262,8 @@ class RoomTradingRepository(
                     targetAlertTriggered = evaluation.updatedTargetAlertTriggered,
                     lossAlertTriggered = evaluation.updatedLossAlertTriggered,
                     reflectionText = baselineRecord.reflectionText,
-                    updatedAtMillis = timeProvider()
+                    updatedAtMillis = timeProvider(),
+                    isAutoCarriedOver = false
                 )
             )
 
@@ -196,12 +276,16 @@ class RoomTradingRepository(
         type: TradeType,
         amount: BigDecimal,
         note: String,
-        timestampMillis: Long
+        timestampMillis: Long,
+        stakeAmount: BigDecimal?,
+        payoutPercent: BigDecimal?
     ): AlertEvaluationResult {
         require(amount > BigDecimal.ZERO) {
             "Trade amount must be greater than zero."
         }
         val normalizedAmount = MoneyCalculator.normalizeCurrency(amount)
+        val normalizedStake = stakeAmount?.let { MoneyCalculator.normalizeCurrency(it) }
+        val normalizedPayout = payoutPercent?.let { MoneyCalculator.normalizeCurrency(it) }
         val dateKey = date.toString()
 
         return transactionRunner.runInTransaction {
@@ -210,6 +294,8 @@ class RoomTradingRepository(
                     dateKey = dateKey,
                     type = type,
                     amount = normalizedAmount,
+                    stakeAmount = normalizedStake,
+                    payoutPercent = normalizedPayout,
                     note = note.trim(),
                     timestampMillis = timestampMillis
                 )
@@ -222,12 +308,16 @@ class RoomTradingRepository(
         tradeId: Long,
         type: TradeType,
         amount: BigDecimal,
-        note: String
+        note: String,
+        stakeAmount: BigDecimal?,
+        payoutPercent: BigDecimal?
     ): AlertEvaluationResult {
         require(amount > BigDecimal.ZERO) {
             "Trade amount must be greater than zero."
         }
         val normalizedAmount = MoneyCalculator.normalizeCurrency(amount)
+        val normalizedStake = stakeAmount?.let { MoneyCalculator.normalizeCurrency(it) }
+        val normalizedPayout = payoutPercent?.let { MoneyCalculator.normalizeCurrency(it) }
 
         return transactionRunner.runInTransaction {
             val existing = tradeDao.getTradeById(tradeId)
@@ -237,6 +327,8 @@ class RoomTradingRepository(
                 existing.copy(
                     type = type,
                     amount = normalizedAmount,
+                    stakeAmount = normalizedStake,
+                    payoutPercent = normalizedPayout,
                     note = note.trim()
                 )
             )
@@ -266,7 +358,8 @@ class RoomTradingRepository(
                 targetAlertTriggered = false,
                 lossAlertTriggered = false,
                 reflectionText = reflectionText,
-                updatedAtMillis = now
+                updatedAtMillis = now,
+                isAutoCarriedOver = false
             )
             dailyRecordDao.upsert(updated)
         }
