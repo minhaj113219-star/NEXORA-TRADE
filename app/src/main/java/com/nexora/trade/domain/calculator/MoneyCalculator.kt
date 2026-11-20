@@ -31,6 +31,41 @@ object MoneyCalculator {
         return normalizeCurrency(parsed)
     }
 
+    fun parsePayoutPercent(rawInput: String): BigDecimal? {
+        val trimmed = rawInput.trim()
+        if (trimmed.isEmpty() || !POSITIVE_AMOUNT_REGEX.matches(trimmed)) {
+            return null
+        }
+        val parsed = trimmed.toBigDecimalOrNull() ?: return null
+        if (parsed <= BigDecimal.ZERO || parsed > MoneyConstants.HUNDRED) {
+            return null
+        }
+        return normalizeCurrency(parsed)
+    }
+
+    fun calculateProfitFromPayout(
+        stakeAmount: BigDecimal,
+        payoutPercent: BigDecimal
+    ): BigDecimal {
+        if (stakeAmount <= BigDecimal.ZERO || payoutPercent <= BigDecimal.ZERO) {
+            return MoneyConstants.ZERO_CURRENCY
+        }
+        return normalizeCurrency(
+            stakeAmount.multiply(payoutPercent)
+                .divide(MoneyConstants.HUNDRED, 6, MoneyConstants.CURRENCY_ROUNDING)
+        )
+    }
+
+    fun formatPayoutPercent(percent: BigDecimal): String {
+        val stripped = percent.stripTrailingZeros()
+        val text = if (stripped.scale() <= 0) {
+            stripped.toPlainString()
+        } else {
+            normalizeCurrency(percent).stripTrailingZeros().toPlainString()
+        }
+        return "$text%"
+    }
+
     fun calculateSignedTradeAmount(trade: TradeEntry): BigDecimal {
         val positiveMagnitude = normalizeCurrency(trade.amount.abs())
         return when (trade.type) {
