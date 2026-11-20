@@ -13,10 +13,10 @@ data class TradeEntry(
     val date: LocalDate,
     val type: TradeType,
     val amount: BigDecimal,
-    val stakeAmount: BigDecimal? = null,
-    val payoutPercent: BigDecimal? = null,
     val note: String = "",
-    val timestampMillis: Long
+    val timestampMillis: Long,
+    val stakeAmount: BigDecimal? = null,
+    val payoutPercent: BigDecimal? = null
 )
 
 data class DailyRecord(
