@@ -17,6 +17,13 @@ interface DailyRecordDao {
 
     @Query(
         "SELECT * FROM daily_records " +
+            "WHERE dateKey < :dateKey AND startingBalance IS NOT NULL " +
+            "ORDER BY dateKey DESC"
+    )
+    suspend fun getRecordsWithBalanceBefore(dateKey: String): List<DailyRecordEntity>
+
+    @Query(
+        "SELECT * FROM daily_records " +
             "WHERE dateKey BETWEEN :startDateKey AND :endDateKey " +
             "ORDER BY dateKey DESC"
     )
