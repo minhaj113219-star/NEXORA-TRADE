@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -57,6 +58,30 @@ class TradingRepositoryTest {
 
         assertEquals(0, BigDecimal("237.50").compareTo(yesterdaySnap.summary.currentBalance))
         assertEquals(DailyStatus.LOSS_LIMIT_REACHED, yesterdaySnap.summary.status)
+    }
+
+    @Test
+    fun `ensureCarryOverStartingBalance carries over previous day ending balance and respects manual edit`() = runTest {
+        repository.setStartingBalance(yesterday, BigDecimal("100.00"))
+        repository.addTrade(yesterday, TradeType.LOSS, BigDecimal("10.00"), "Loss", 1000L)
+
+        repository.ensureCarryOverStartingBalance(today)
+        var todaySnap = repository.observeDaySnapshot(today).first()
+        assertEquals(0, BigDecimal("90.00").compareTo(todaySnap.summary.startingBalance))
+        assertTrue(todaySnap.record?.isAutoCarriedOver == true)
+        assertEquals(0, BigDecimal("9.00").compareTo(todaySnap.summary.dailyProfitTarget))
+        assertEquals(0, BigDecimal("4.50").compareTo(todaySnap.summary.maxDailyLoss))
+
+        repository.addTrade(yesterday, TradeType.PROFIT, BigDecimal("8.50"), "Recovery", 2000L)
+        repository.ensureCarryOverStartingBalance(today)
+        todaySnap = repository.observeDaySnapshot(today).first()
+        assertEquals(0, BigDecimal("98.50").compareTo(todaySnap.summary.startingBalance))
+
+        repository.setStartingBalance(today, BigDecimal("150.00"))
+        repository.ensureCarryOverStartingBalance(today)
+        todaySnap = repository.observeDaySnapshot(today).first()
+        assertEquals(0, BigDecimal("150.00").compareTo(todaySnap.summary.startingBalance))
+        assertFalse(todaySnap.record?.isAutoCarriedOver == true)
     }
 
     @Test
@@ -127,6 +152,11 @@ class TradingRepositoryTest {
 
         override suspend fun getRecord(dateKey: String): DailyRecordEntity? =
             store.value[dateKey]
+
+        override suspend fun getRecordsWithBalanceBefore(dateKey: String): List<DailyRecordEntity> =
+            store.value.values
+                .filter { it.dateKey < dateKey && it.startingBalance != null }
+                .sortedByDescending { it.dateKey }
 
         override fun observeRecordsInRange(
             startDateKey: String,
