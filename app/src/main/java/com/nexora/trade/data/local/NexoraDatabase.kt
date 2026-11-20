@@ -5,6 +5,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.nexora.trade.data.local.converter.NexoraTypeConverters
 import com.nexora.trade.data.local.dao.DailyRecordDao
 import com.nexora.trade.data.local.dao.TradeDao
@@ -16,7 +18,7 @@ import com.nexora.trade.data.local.entity.TradeEntity
         DailyRecordEntity::class,
         TradeEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(NexoraTypeConverters::class)
@@ -28,6 +30,16 @@ abstract class NexoraDatabase : RoomDatabase() {
     companion object {
         private const val DATABASE_NAME = "nexora_trade.db"
 
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE daily_records ADD COLUMN isAutoCarriedOver INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL("ALTER TABLE trades ADD COLUMN stakeAmount TEXT")
+                db.execSQL("ALTER TABLE trades ADD COLUMN payoutPercent TEXT")
+            }
+        }
+
         @Volatile
         private var instance: NexoraDatabase? = null
 
@@ -37,7 +49,10 @@ abstract class NexoraDatabase : RoomDatabase() {
                     context.applicationContext,
                     NexoraDatabase::class.java,
                     DATABASE_NAME
-                ).build().also { instance = it }
+                )
+                    .addMigrations(MIGRATION_1_2)
+                    .build()
+                    .also { instance = it }
             }
         }
     }
