@@ -101,6 +101,8 @@ class DailyReflectionViewModelTest {
 
         override suspend fun getTradeById(tradeId: Long): TradeEntry? = null
 
+        override suspend fun ensureCarryOverStartingBalance(date: LocalDate): AlertEvaluationResult? = null
+
         override suspend fun setStartingBalance(
             date: LocalDate,
             startingBalance: BigDecimal
@@ -111,14 +113,18 @@ class DailyReflectionViewModelTest {
             type: TradeType,
             amount: BigDecimal,
             note: String,
-            timestampMillis: Long
+            timestampMillis: Long,
+            stakeAmount: BigDecimal?,
+            payoutPercent: BigDecimal?
         ): AlertEvaluationResult = AlertEvaluationResult(null, false, false)
 
         override suspend fun updateTrade(
             tradeId: Long,
             type: TradeType,
             amount: BigDecimal,
-            note: String
+            note: String,
+            stakeAmount: BigDecimal?,
+            payoutPercent: BigDecimal?
         ): AlertEvaluationResult = AlertEvaluationResult(null, false, false)
 
         override suspend fun deleteTrade(tradeId: Long) = Unit
