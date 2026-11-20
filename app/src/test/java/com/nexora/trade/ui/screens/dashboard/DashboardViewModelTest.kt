@@ -91,6 +91,30 @@ class DashboardViewModelTest {
         collectJob.cancel()
     }
 
+    @Test
+    fun `dashboard auto carries over previous day ending balance when today has no starting balance`() = runTest {
+        val fakeRepo = FakeTradingRepository().apply {
+            val yesterday = testDate.minusDays(1)
+            setStartingBalance(yesterday, BigDecimal("100.00"))
+            addTrade(yesterday, TradeType.LOSS, BigDecimal("10.00"), "Loss", 1000L)
+        }
+
+        val viewModel = DashboardViewModel(
+            repository = fakeRepo,
+            dateProvider = { testDate }
+        )
+
+        val collectJob = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+
+        assertTrue(viewModel.uiState.value.summary.hasValidStartingBalance)
+        assertEquals(0, BigDecimal("90.00").compareTo(viewModel.uiState.value.summary.startingBalance))
+        assertEquals(0, BigDecimal("90.00").compareTo(viewModel.uiState.value.summary.currentBalance))
+
+        collectJob.cancel()
+    }
+
     private class FakeTradingRepository : TradingRepository {
         private val records = MutableStateFlow<Map<LocalDate, DailyRecord>>(emptyMap())
         private val trades = MutableStateFlow<List<TradeEntry>>(emptyList())
@@ -130,6 +154,46 @@ class DashboardViewModelTest {
         override suspend fun getTradeById(tradeId: Long): TradeEntry? =
             trades.value.firstOrNull { it.id == tradeId }
 
+        override suspend fun ensureCarryOverStartingBalance(date: LocalDate): AlertEvaluationResult? {
+            val existingToday = records.value[date]
+            if (existingToday?.startingBalance != null && !existingToday.isAutoCarriedOver) {
+                return null
+            }
+            val prevRecord = records.value.values
+                .filter {
+                    it.date < date &&
+                        it.startingBalance != null &&
+                        it.startingBalance > BigDecimal.ZERO
+                }
+                .maxByOrNull { it.date }
+                ?: return null
+
+            val prevTrades = trades.value.filter { it.date == prevRecord.date }
+            val prevSummary = MoneyCalculator.calculateDailySummary(
+                date = prevRecord.date,
+                startingBalance = prevRecord.startingBalance,
+                trades = prevTrades
+            )
+            if (prevSummary.currentBalance <= BigDecimal.ZERO) {
+                return null
+            }
+
+            val normalized = MoneyCalculator.normalizeCurrency(prevSummary.currentBalance)
+            val todayTrades = trades.value.filter { it.date == date }
+            val todaySummary = MoneyCalculator.calculateDailySummary(date, normalized, todayTrades)
+            val baseline = (existingToday ?: DailyRecord(date = date, startingBalance = normalized))
+                .copy(startingBalance = normalized, isAutoCarriedOver = true)
+            val eval = AlertEvaluator.evaluate(todaySummary, baseline)
+
+            records.value = records.value + (
+                date to baseline.copy(
+                    targetAlertTriggered = eval.updatedTargetAlertTriggered,
+                    lossAlertTriggered = eval.updatedLossAlertTriggered
+                )
+            )
+            return eval
+        }
+
         override suspend fun setStartingBalance(
             date: LocalDate,
             startingBalance: BigDecimal
@@ -145,7 +209,8 @@ class DashboardViewModelTest {
                     startingBalance = normalized,
                     targetAlertTriggered = eval.updatedTargetAlertTriggered,
                     lossAlertTriggered = eval.updatedLossAlertTriggered,
-                    reflectionText = existing?.reflectionText.orEmpty()
+                    reflectionText = existing?.reflectionText.orEmpty(),
+                    isAutoCarriedOver = false
                 )
             )
             return eval
@@ -156,10 +221,21 @@ class DashboardViewModelTest {
             type: TradeType,
             amount: BigDecimal,
             note: String,
-            timestampMillis: Long
+            timestampMillis: Long,
+            stakeAmount: BigDecimal?,
+            payoutPercent: BigDecimal?
         ): AlertEvaluationResult {
             val id = (trades.value.maxOfOrNull { it.id } ?: 0L) + 1L
-            trades.value = trades.value + TradeEntry(id, date, type, amount, note, timestampMillis)
+            trades.value = trades.value + TradeEntry(
+                id = id,
+                date = date,
+                type = type,
+                amount = amount,
+                note = note,
+                timestampMillis = timestampMillis,
+                stakeAmount = stakeAmount,
+                payoutPercent = payoutPercent
+            )
             return AlertEvaluationResult(null, false, false)
         }
 
@@ -167,7 +243,9 @@ class DashboardViewModelTest {
             tradeId: Long,
             type: TradeType,
             amount: BigDecimal,
-            note: String
+            note: String,
+            stakeAmount: BigDecimal?,
+            payoutPercent: BigDecimal?
         ): AlertEvaluationResult = AlertEvaluationResult(null, false, false)
 
         override suspend fun deleteTrade(tradeId: Long) {
