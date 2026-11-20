@@ -165,6 +165,11 @@ class AlertThresholdIntegrationTest {
         override suspend fun getRecord(dateKey: String): DailyRecordEntity? =
             store.value[dateKey]
 
+        override suspend fun getRecordsWithBalanceBefore(dateKey: String): List<DailyRecordEntity> =
+            store.value.values
+                .filter { it.dateKey < dateKey && it.startingBalance != null }
+                .sortedByDescending { it.dateKey }
+
         override fun observeRecordsInRange(
             startDateKey: String,
             endDateKey: String
