@@ -128,6 +128,8 @@ class ThirtyDayAndHistoryViewModelTest {
         override suspend fun getTradeById(tradeId: Long): TradeEntry? =
             trades.value.firstOrNull { it.id == tradeId }
 
+        override suspend fun ensureCarryOverStartingBalance(date: LocalDate): AlertEvaluationResult? = null
+
         override suspend fun setStartingBalance(
             date: LocalDate,
             startingBalance: BigDecimal
@@ -143,9 +145,20 @@ class ThirtyDayAndHistoryViewModelTest {
             type: TradeType,
             amount: BigDecimal,
             note: String,
-            timestampMillis: Long
+            timestampMillis: Long,
+            stakeAmount: BigDecimal?,
+            payoutPercent: BigDecimal?
         ): AlertEvaluationResult {
-            trades.value = trades.value + TradeEntry(nextId++, date, type, amount, note, timestampMillis)
+            trades.value = trades.value + TradeEntry(
+                id = nextId++,
+                date = date,
+                type = type,
+                amount = amount,
+                note = note,
+                timestampMillis = timestampMillis,
+                stakeAmount = stakeAmount,
+                payoutPercent = payoutPercent
+            )
             return AlertEvaluationResult(null, false, false)
         }
 
@@ -153,7 +166,9 @@ class ThirtyDayAndHistoryViewModelTest {
             tradeId: Long,
             type: TradeType,
             amount: BigDecimal,
-            note: String
+            note: String,
+            stakeAmount: BigDecimal?,
+            payoutPercent: BigDecimal?
         ): AlertEvaluationResult = AlertEvaluationResult(null, false, false)
 
         override suspend fun deleteTrade(tradeId: Long) = Unit
