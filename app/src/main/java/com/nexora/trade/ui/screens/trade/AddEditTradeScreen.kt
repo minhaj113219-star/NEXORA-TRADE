@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +25,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,9 +56,10 @@ import com.nexora.trade.ui.components.NexoraCard
 import com.nexora.trade.ui.components.pnlColorFor
 import com.nexora.trade.ui.screens.dashboard.ThresholdAlertDialog
 import com.nexora.trade.ui.theme.NexoraTheme
-import java.math.BigDecimal
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val PRESET_PAYOUTS = listOf("80", "85", "90", "95", "100")
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddEditTradeScreen(
     viewModel: AddEditTradeViewModel,
@@ -76,6 +81,8 @@ fun AddEditTradeScreen(
             confirmAmount.negate()
         }
         val formattedSigned = MoneyCalculator.formatAmount(signedPreview, includePlusSign = true)
+        val confirmStake = uiState.pendingConfirmStake
+        val confirmPayout = uiState.pendingConfirmPayout
 
         AlertDialog(
             onDismissRequest = viewModel::dismissSaveConfirmation,
@@ -93,12 +100,25 @@ fun AddEditTradeScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (confirmStake != null) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        val payoutInfo = if (uiState.selectedType == TradeType.PROFIT && confirmPayout != null) {
+                            "  •  Payout: ${MoneyCalculator.formatPayoutPercent(confirmPayout)}"
+                        } else {
+                            ""
+                        }
+                        Text(
+                            text = "Trade Amount: ${MoneyCalculator.formatAmount(confirmStake)}$payoutInfo",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = if (uiState.selectedType == TradeType.PROFIT) {
-                            "Result: Profit ($formattedSigned)"
+                            "Net Result: Profit ($formattedSigned)"
                         } else {
-                            "Result: Loss ($formattedSigned)"
+                            "Net Result: Loss ($formattedSigned)"
                         },
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = if (uiState.selectedType == TradeType.PROFIT) {
@@ -281,6 +301,97 @@ fun AddEditTradeScreen(
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                if (uiState.selectedType == TradeType.PROFIT) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Asset Payout (%)",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            PRESET_PAYOUTS.forEach { preset ->
+                                val isSelected = uiState.payoutInput.trim() == preset
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { viewModel.updatePayoutInput(preset) },
+                                    label = { Text("$preset%") },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = NexoraTheme.colors.profitContainer,
+                                        selectedLabelColor = NexoraTheme.colors.profit
+                                    )
+                                )
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = uiState.payoutInput,
+                            onValueChange = viewModel::updatePayoutInput,
+                            label = { Text("Payout Percentage (%)") },
+                            placeholder = { Text("e.g., 85") },
+                            suffix = { Text("%") },
+                            singleLine = true,
+                            isError = uiState.payoutError != null,
+                            supportingText = uiState.payoutError?.let { msg ->
+                                {
+                                    Text(
+                                        text = msg,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Decimal
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                val previewNet = uiState.previewNetAmount
+                if (previewNet != null) {
+                    val isProfit = uiState.selectedType == TradeType.PROFIT
+                    val accentColor = if (isProfit) NexoraTheme.colors.profit else NexoraTheme.colors.loss
+                    val bgColor = if (isProfit) NexoraTheme.colors.profitContainer else NexoraTheme.colors.lossContainer
+                    val signedNet = if (isProfit) previewNet else previewNet.negate()
+
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = bgColor,
+                        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isProfit) {
+                                    "Net Return (${uiState.payoutInput.trim()}%)"
+                                } else {
+                                    "Net Loss (100% of stake)"
+                                },
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                color = accentColor
+                            )
+                            Text(
+                                text = MoneyCalculator.formatAmount(signedNet, includePlusSign = true),
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontFeatureSettings = "tnum"
+                                ),
+                                color = accentColor
+                            )
+                        }
+                    }
+                }
 
                 OutlinedTextField(
                     value = uiState.noteInput,
