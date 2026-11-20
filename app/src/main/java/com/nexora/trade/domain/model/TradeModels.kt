@@ -13,6 +13,8 @@ data class TradeEntry(
     val date: LocalDate,
     val type: TradeType,
     val amount: BigDecimal,
+    val stakeAmount: BigDecimal? = null,
+    val payoutPercent: BigDecimal? = null,
     val note: String = "",
     val timestampMillis: Long
 )
@@ -23,7 +25,8 @@ data class DailyRecord(
     val targetAlertTriggered: Boolean = false,
     val lossAlertTriggered: Boolean = false,
     val reflectionText: String = "",
-    val updatedAtMillis: Long = 0L
+    val updatedAtMillis: Long = 0L,
+    val isAutoCarriedOver: Boolean = false
 )
 
 enum class DailyStatus {
