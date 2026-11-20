@@ -1,5 +1,6 @@
 package com.nexora.trade.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.nexora.trade.domain.model.DailyRecord
@@ -14,7 +15,9 @@ data class DailyRecordEntity(
     val targetAlertTriggered: Boolean = false,
     val lossAlertTriggered: Boolean = false,
     val reflectionText: String = "",
-    val updatedAtMillis: Long = 0L
+    val updatedAtMillis: Long = 0L,
+    @ColumnInfo(defaultValue = "0")
+    val isAutoCarriedOver: Boolean = false
 ) {
     fun toDomain(): DailyRecord = DailyRecord(
         date = LocalDate.parse(dateKey),
@@ -22,6 +25,7 @@ data class DailyRecordEntity(
         targetAlertTriggered = targetAlertTriggered,
         lossAlertTriggered = lossAlertTriggered,
         reflectionText = reflectionText,
-        updatedAtMillis = updatedAtMillis
+        updatedAtMillis = updatedAtMillis,
+        isAutoCarriedOver = isAutoCarriedOver
     )
 }
