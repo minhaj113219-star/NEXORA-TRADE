@@ -21,6 +21,8 @@ data class TradeEntity(
     val dateKey: String,
     val type: TradeType,
     val amount: BigDecimal,
+    val stakeAmount: BigDecimal? = null,
+    val payoutPercent: BigDecimal? = null,
     val note: String = "",
     val timestampMillis: Long
 ) {
@@ -29,6 +31,8 @@ data class TradeEntity(
         date = LocalDate.parse(dateKey),
         type = type,
         amount = amount,
+        stakeAmount = stakeAmount,
+        payoutPercent = payoutPercent,
         note = note,
         timestampMillis = timestampMillis
     )
