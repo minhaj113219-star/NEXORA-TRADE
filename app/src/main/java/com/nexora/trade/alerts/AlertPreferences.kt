@@ -15,6 +15,8 @@ interface AppSettingsStore {
     fun setVibrationEnabled(enabled: Boolean)
     fun hasPromptedNotificationPermission(): Boolean
     fun markNotificationPermissionPrompted()
+    fun getLastPayoutPercent(): String
+    fun setLastPayoutPercent(percent: String)
 }
 
 class AlertPreferences(context: Context) : AppSettingsStore {
@@ -53,11 +55,20 @@ class AlertPreferences(context: Context) : AppSettingsStore {
         prefs.edit().putBoolean(KEY_PROMPTED_NOTIFICATION_PERMISSION, true).apply()
     }
 
+    override fun getLastPayoutPercent(): String =
+        prefs.getString(KEY_LAST_PAYOUT_PERCENT, DEFAULT_PAYOUT_PERCENT) ?: DEFAULT_PAYOUT_PERCENT
+
+    override fun setLastPayoutPercent(percent: String) {
+        prefs.edit().putString(KEY_LAST_PAYOUT_PERCENT, percent).apply()
+    }
+
     private companion object {
         const val PREFS_NAME = "nexora_alert_preferences"
         const val KEY_DARK_THEME = "dark_theme_enabled"
         const val KEY_SOUND_ENABLED = "sound_enabled"
         const val KEY_VIBRATION_ENABLED = "vibration_enabled"
         const val KEY_PROMPTED_NOTIFICATION_PERMISSION = "prompted_notification_permission"
+        const val KEY_LAST_PAYOUT_PERCENT = "last_payout_percent"
+        const val DEFAULT_PAYOUT_PERCENT = "85"
     }
 }
