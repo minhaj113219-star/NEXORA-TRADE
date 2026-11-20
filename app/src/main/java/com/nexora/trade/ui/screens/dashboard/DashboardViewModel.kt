@@ -88,11 +88,27 @@ class DashboardViewModel(
         initialValue = DashboardUiState(todayDate = activeDate.value)
     )
 
+    init {
+        syncCarryOverBalance(activeDate.value)
+    }
+
     fun refreshDateIfChanged() {
         val current = dateProvider()
         if (activeDate.value != current) {
             activeDate.value = current
             activeAlertBanner.value = null
+        }
+        syncCarryOverBalance(current)
+    }
+
+    private fun syncCarryOverBalance(targetDate: LocalDate) {
+        viewModelScope.launch {
+            val alertResult = repository.ensureCarryOverStartingBalance(targetDate)
+            val alertToTrigger = alertResult?.alertToTrigger
+            if (alertToTrigger != null) {
+                alertManager.dispatchThresholdAlert(alertToTrigger, targetDate)
+                activeAlertBanner.update { alertToTrigger }
+            }
         }
     }
 
