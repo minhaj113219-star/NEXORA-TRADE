@@ -49,6 +49,7 @@ class SettingsViewModelTest {
         private var sound = true
         private var vibration = true
         private var prompted = false
+        private var lastPayout = "85"
 
         override fun isDarkTheme(): Boolean = _darkThemeFlow.value
         override fun setDarkTheme(enabled: Boolean) {
@@ -68,6 +69,11 @@ class SettingsViewModelTest {
         override fun hasPromptedNotificationPermission(): Boolean = prompted
         override fun markNotificationPermissionPrompted() {
             prompted = true
+        }
+
+        override fun getLastPayoutPercent(): String = lastPayout
+        override fun setLastPayoutPercent(percent: String) {
+            lastPayout = percent
         }
     }
 
