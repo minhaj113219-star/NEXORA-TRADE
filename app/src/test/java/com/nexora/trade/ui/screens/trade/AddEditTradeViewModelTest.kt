@@ -71,6 +71,44 @@ class AddEditTradeViewModelTest {
     }
 
     @Test
+    fun `add profit trade with 85 percent payout calculates net profit and edit restores stake and payout`() = runTest {
+        val repo = InMemoryRepo().apply {
+            setStartingBalance(testDate, BigDecimal("100.00"))
+        }
+
+        val addVm = AddEditTradeViewModel(
+            repository = repo,
+            date = testDate,
+            tradeId = -1L
+        )
+
+        addVm.selectTradeType(TradeType.PROFIT)
+        addVm.updateAmountInput("10")
+        addVm.updatePayoutInput("85")
+        assertEquals(0, BigDecimal("8.50").compareTo(addVm.uiState.value.previewNetAmount))
+
+        addVm.requestSaveConfirmation()
+        assertEquals(0, BigDecimal("8.50").compareTo(addVm.uiState.value.pendingConfirmAmount))
+        assertEquals(0, BigDecimal("10.00").compareTo(addVm.uiState.value.pendingConfirmStake))
+        assertEquals(0, BigDecimal("85.00").compareTo(addVm.uiState.value.pendingConfirmPayout))
+
+        addVm.confirmSaveTrade()
+
+        val savedTrade = repo.observeDaySnapshot(testDate).first().trades.first()
+        assertEquals(0, BigDecimal("8.50").compareTo(savedTrade.amount))
+        assertEquals(0, BigDecimal("10.00").compareTo(savedTrade.stakeAmount))
+        assertEquals(0, BigDecimal("85.00").compareTo(savedTrade.payoutPercent))
+
+        val editVm = AddEditTradeViewModel(
+            repository = repo,
+            date = testDate,
+            tradeId = savedTrade.id
+        )
+        assertEquals("10", editVm.uiState.value.amountInput)
+        assertEquals("85", editVm.uiState.value.payoutInput)
+    }
+
+    @Test
     fun `edit trade loads existing entry and updates daily totals`() = runTest {
         val repo = InMemoryRepo().apply {
             setStartingBalance(testDate, BigDecimal("100.00"))
@@ -130,6 +168,8 @@ class AddEditTradeViewModelTest {
         override suspend fun getTradeById(tradeId: Long): TradeEntry? =
             trades.value.firstOrNull { it.id == tradeId }
 
+        override suspend fun ensureCarryOverStartingBalance(date: LocalDate): AlertEvaluationResult? = null
+
         override suspend fun setStartingBalance(
             date: LocalDate,
             startingBalance: BigDecimal
@@ -144,10 +184,21 @@ class AddEditTradeViewModelTest {
             type: TradeType,
             amount: BigDecimal,
             note: String,
-            timestampMillis: Long
+            timestampMillis: Long,
+            stakeAmount: BigDecimal?,
+            payoutPercent: BigDecimal?
         ): AlertEvaluationResult {
             val id = nextId++
-            trades.value = trades.value + TradeEntry(id, date, type, amount, note, timestampMillis)
+            trades.value = trades.value + TradeEntry(
+                id = id,
+                date = date,
+                type = type,
+                amount = amount,
+                note = note,
+                timestampMillis = timestampMillis,
+                stakeAmount = stakeAmount,
+                payoutPercent = payoutPercent
+            )
             return evaluateForDate(date)
         }
 
@@ -155,11 +206,23 @@ class AddEditTradeViewModelTest {
             tradeId: Long,
             type: TradeType,
             amount: BigDecimal,
-            note: String
+            note: String,
+            stakeAmount: BigDecimal?,
+            payoutPercent: BigDecimal?
         ): AlertEvaluationResult {
             val existing = trades.value.first { it.id == tradeId }
             trades.value = trades.value.map {
-                if (it.id == tradeId) it.copy(type = type, amount = amount, note = note) else it
+                if (it.id == tradeId) {
+                    it.copy(
+                        type = type,
+                        amount = amount,
+                        note = note,
+                        stakeAmount = stakeAmount,
+                        payoutPercent = payoutPercent
+                    )
+                } else {
+                    it
+                }
             }
             return evaluateForDate(existing.date)
         }
